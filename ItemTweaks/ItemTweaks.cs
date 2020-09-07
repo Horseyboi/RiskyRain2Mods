@@ -168,11 +168,11 @@ namespace Horseyboi.ItemTweaks {
                 
                 //add the character's to the stack
                 c.Emit(OpCodes.Ldarg_0);
-                c.EmitDelegate<Func<CharacterBody, float>>((self) => {
+                c.EmitDelegate<Func<HealthComponent, float>>((self) => {
 
-                    if (self.teamComponent.teamIndex == TeamIndex.Player) { //Is this a player?
+                    if (self.body.teamComponent.teamIndex == TeamIndex.Player) { //Is this a player?
                         if (PlateDRType.Value == RAPSettingMode.Percent) {
-                            return self.healthComponent.fullCombinedHealth * ArmorPlateDR.Value / 100; //get the chosen percent and return it to the stack to use as damage reduction
+                            return self.fullCombinedHealth * ArmorPlateDR.Value / 100; //get the chosen percent and return it to the stack to use as damage reduction
 
                         } else if (PlateDRType.Value == RAPSettingMode.Fixed) {
                             return ArmorPlateDR.Value; //just return the normal value
