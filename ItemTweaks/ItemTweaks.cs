@@ -10,7 +10,7 @@ using UnityEngine;
 namespace Horseyboi.ItemTweaks {
 
     [BepInDependency("com.bepis.r2api")]
-    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.1.0")]
+    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.1.1")]
 
     public class ItemTweaks : BaseUnityPlugin {
 
