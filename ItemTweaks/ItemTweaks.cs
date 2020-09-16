@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using RoR2;
+using R2API;
 using R2API.Utils;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
@@ -10,41 +12,46 @@ using UnityEngine;
 namespace Horseyboi.ItemTweaks {
 
     [BepInDependency("com.bepis.r2api")]
-    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.1.1")]
+    [BepInDependency("dev.ontrigger.itemstats", BepInDependency.DependencyFlags.SoftDependency)]
+    [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.EveryoneNeedSameModVersion)] //technically this is default behavior but w/e
+    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.2.1")]
+    [R2APISubmoduleDependency(nameof(LanguageAPI))]
 
     public class ItemTweaks : BaseUnityPlugin {
 
-        static ConfigEntry<bool> EnablePlates { get; set; }
-        static ConfigEntry<float> ArmorPlateDR { get; set; }
-        static ConfigEntry<RAPSettingMode> PlateDRType { get; set; }
-        static ConfigEntry<float> MonsterPlateDR { get; set; }
+        public static ConfigEntry<bool> EnablePlates { get; set; }
+        public static ConfigEntry<float> ArmorPlateDR { get; set; }
+        public static ConfigEntry<RAPSettingMode> PlateDRType { get; set; }
+        public static ConfigEntry<float> MonsterPlateDR { get; set; }
+        public static ConfigEntry<RAPSettingMode> MonsterPlateDRType { get; set; }
 
-        static ConfigEntry<bool> EnableUrn { get; set; }
+        public static ConfigEntry<bool> EnableUrn { get; set; }
 
-        static ConfigEntry<bool> EnableKnurl { get; set; }
-        static ConfigEntry<float> KnurlHealthIncrease { get; set; }
-        static ConfigEntry<SettingMode> KnurlHealthType { get; set; }
+        public static ConfigEntry<bool> EnableKnurl { get; set; }
+        public static ConfigEntry<float> KnurlHealthIncrease { get; set; }
+        public static ConfigEntry<SettingMode> KnurlHealthType { get; set; }
 
-        static ConfigEntry<bool> EnableHoof { get; set; }
-        static ConfigEntry<float> InitialHoof { get; set; }
-        static ConfigEntry<float> StackHoof { get; set; }
+        public static ConfigEntry<bool> EnableHoof { get; set; }
+        public static ConfigEntry<float> InitialHoof { get; set; }
+        public static ConfigEntry<float> StackHoof { get; set; }
 
-        static ConfigEntry<bool> EnableNRG { get; set; }
-        static ConfigEntry<float> InitialNRG { get; set; }
-        static ConfigEntry<float> StackNRG { get; set; }
+        public static ConfigEntry<bool> EnableNRG { get; set; }
+        public static ConfigEntry<float> InitialNRG { get; set; }
+        public static ConfigEntry<float> StackNRG { get; set; }
 
-        private enum RAPSettingMode {
+        public enum RAPSettingMode {
             Percent,
             Fixed,
             Armor
         };
 
-        private enum SettingMode {
+        public enum SettingMode {
             Percent,
             Fixed
         };
 
         public void Awake() {
+            //Set up configs
             //Plates
             EnablePlates = Config.Bind<bool>(
                 "Repulsion Armor Plate",
@@ -64,11 +71,17 @@ namespace Horseyboi.ItemTweaks {
                 0.01f,
                 "Sets the amount of damage resistance Repulsion Armor Plate confers.\nIn Percent mode, this is a percent of your max health (e.g. 0.01 reduces damage by 1% of maximum health);\nIn Fixed mode, this is a static value;\nIn Armor mode this is the amount of Armor Repulsion Armor Plates confer per stack (I recommend somewhere around 7 for this mode)."
                 );
+            MonsterPlateDRType = Config.Bind<RAPSettingMode>(
+                "Repulsion Armor Plate",
+                "Monster Damage Resistance Type",
+                RAPSettingMode.Fixed,
+                "Sets whether Repulsion Armor Plate, when used by monsters, has damage reduction is fixed value, a percentage of maximum health, or given as Armor."
+                );
             MonsterPlateDR = Config.Bind<float>(
                 "Repulsion Armor Plate",
                 "Monster Damage Resistance",
                 5f,
-                "Sets how much damage resistance monsters get from Repulsion Armor Plates. This is fixed like vanilla."
+                "Sets how much damage resistance monsters get from Repulsion Armor Plates."
                 );
             //Urn
             EnableUrn = Config.Bind<bool>(
@@ -135,6 +148,11 @@ namespace Horseyboi.ItemTweaks {
                 "Sets the bonus Energy Drink grants per additional stack."
                 );
 
+            //check if itemstats is installed so I can funk out some better item descs
+            if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("dev.ontrigger.itemstats")) {
+                AdvTooltips.DoStuff();
+            }
+
             if (EnablePlates.Value) {
                 ChangeArmorPlates();
             }
@@ -153,6 +171,16 @@ namespace Horseyboi.ItemTweaks {
         }
 
         private void ChangeArmorPlates() {
+            //language changes
+            if (PlateDRType.Value == RAPSettingMode.Percent) {
+                LanguageAPI.Add("ITEM_REPULSIONARMORPLATE_DESC", "Reduce all <style=cIsDamage>incoming damage</style> by <style=cIsDamage>" + (ArmorPlateDR.Value * 100).ToString() + "%</style> of your <style=cIsHealing>maximum health and shields</style> <style=cStack> (+" + (ArmorPlateDR.Value * 100).ToString() + "% per stack)</style>. Cannot reduce damage below <style=cIsDamage>1</style>.");
+            } else if (PlateDRType.Value == RAPSettingMode.Fixed) {
+                LanguageAPI.Add("ITEM_REPULSIONARMORPLATE_DESC", "Reduce all <style=cIsDamage>incoming damage</style> by <style=cIsDamage>" + ArmorPlateDR.Value.ToString() + "</style> <style=cStack> (+" + (ArmorPlateDR.Value).ToString() + " per stack)</style>. Cannot reduce damage below <style=cIsDamage>1</style>.");
+            } else if (PlateDRType.Value == RAPSettingMode.Armor) {
+                LanguageAPI.Add("ITEM_REPULSIONARMORPLATE_PICKUP", "Reduce incoming damage.");
+                LanguageAPI.Add("ITEM_REPULSIONARMORPLATE_DESC", "<style=cIsHealing>Increase armor</style> by <style=cIsHealing>" + ArmorPlateDR.Value.ToString() + "</style> <style=cStack>(+" + ArmorPlateDR.Value.ToString() + " per stack)</style>.");
+            }
+
             IL.RoR2.HealthComponent.TakeDamage += (il) => {
 
                 //Match the location of the armor plate calculation and set the cursor to the right line
@@ -172,7 +200,7 @@ namespace Horseyboi.ItemTweaks {
 
                     if (self.body.teamComponent.teamIndex == TeamIndex.Player) { //Is this a player?
                         if (PlateDRType.Value == RAPSettingMode.Percent) {
-                            return self.fullCombinedHealth * ArmorPlateDR.Value / 100; //get the chosen percent and return it to the stack to use as damage reduction
+                            return self.fullCombinedHealth * ArmorPlateDR.Value; //get the chosen percent and return it to the stack to use as damage reduction
 
                         } else if (PlateDRType.Value == RAPSettingMode.Fixed) {
                             return ArmorPlateDR.Value; //just return the normal value
@@ -181,16 +209,28 @@ namespace Horseyboi.ItemTweaks {
                             return 0f; //make RAP do nothing here if we want armor instead
 
                         } else {
-                            Debug.LogWarning("RAP not set to valid mode!");
+                            Debug.LogWarning("Player RAP not set to valid mode!");
                             return 5f; //something went wrong
                         }
-                    } else { //This is not a player and probably a monster
-                        return MonsterPlateDR.Value;
+                    } else { //This is not a player and probably a monster -- it'd be funny to see a pot with items though
+                        if (MonsterPlateDRType.Value == RAPSettingMode.Percent) {
+                            return self.fullCombinedHealth * MonsterPlateDR.Value; //get the chosen percent and return it to the stack to use as damage reduction
+
+                        } else if (MonsterPlateDRType.Value == RAPSettingMode.Fixed) {
+                            return MonsterPlateDR.Value; //just return the normal value
+
+                        } else if (MonsterPlateDRType.Value == RAPSettingMode.Armor) {
+                            return 0f; //make RAP do nothing here if we want armor instead
+
+                        } else {
+                            Debug.LogWarning("Monster RAP not set to valid mode!");
+                            return 5f; //something went wrong
+                        }
                     }
                 });
             };
 
-            if (PlateDRType.Value == RAPSettingMode.Armor) {
+            if (PlateDRType.Value == RAPSettingMode.Armor || MonsterPlateDRType.Value == RAPSettingMode.Armor) {
                 IL.RoR2.CharacterBody.RecalculateStats += (il) => {
                     //find the armor calculations and put the cursor in the right spot
                     ILCursor c = new ILCursor(il);
@@ -208,13 +248,21 @@ namespace Horseyboi.ItemTweaks {
                     c.EmitDelegate<Action<CharacterBody>>((self) => {
                         var numPlates = self.inventory.GetItemCount(ItemIndex.ArmorPlate);
                         //armor is readonly so Reflection is used to tiptoe around that
-                        self.InvokeMethod("set_armor", self.armor + numPlates * ArmorPlateDR.Value);
+                        if (self.teamComponent.teamIndex == TeamIndex.Player) {
+                            self.InvokeMethod("set_armor", self.armor + numPlates * ArmorPlateDR.Value);
+                        } else {
+                            self.InvokeMethod("set_armor", self.armor + numPlates * MonsterPlateDR.Value);
+                        }
                     });
                 };
             }
         }
 
         private void ChangeMiredUrn() {
+            //description change -- funnily enough no itemstats change is necessary as it already erroneously says "enemies"
+            LanguageAPI.Add("ITEM_SIPHONONLOWHEALTH_PICKUP", "Siphon health from nearby enemies while in combat.");
+            LanguageAPI.Add("ITEM_SIPHONONLOWHEALTH_DESC", "While in combat, the nearest 1 <style=cStack>(+1 per stack)</style> enemies to you within <style=cIsDamage>13m</style> will be 'tethered' to you, dealing <style=cIsDamage>100%</style> damage per second, applying <style=cIsDamage>tar</style>, and <style=cIsHealing>healing</style> you for <style=cIsHealing>100%</style> of the damage dealt.");
+
             On.RoR2.SiphonNearbyController.SearchForTargets += (orig, self, dest) => {
 
                 //use reflection to get values we can't access
@@ -239,6 +287,13 @@ namespace Horseyboi.ItemTweaks {
         }
 
         private void ChangeKnurl() {
+            //description changes
+            if (KnurlHealthType.Value == SettingMode.Percent) {
+                LanguageAPI.Add("ITEM_KNURL_DESC", "<style=cIsHealing>Increase maximum health</style> by <style=cIsHealing>" + KnurlHealthIncrease.Value * 100 + "%</style> <style=cStack>(+" + KnurlHealthIncrease.Value * 100 + "% per stack)</style> and <style=cIsHealing>base health regeneration</style> by <style=cIsHealing>+1.6 hp/s<style=cStack> (+1.6 hp/s per stack)</style>.");
+            } else if (KnurlHealthType.Value == SettingMode.Fixed) {
+                LanguageAPI.Add("ITEM_KNURL_DESC", "<style=cIsHealing>Increase maximum health</style> by <style=cIsHealing>" + KnurlHealthIncrease.Value + "</style> <style=cStack>(+" + KnurlHealthIncrease.Value + " per stack)</style> and <style=cIsHealing>base health regeneration</style> by <style=cIsHealing>+1.6 hp/s<style=cStack> (+1.6 hp/s per stack)</style>.");
+            }
+
             IL.RoR2.CharacterBody.RecalculateStats += (il) => {
                 //Match the location where Knurl calculations happen
                 ILCursor c = new ILCursor(il);
@@ -250,21 +305,23 @@ namespace Horseyboi.ItemTweaks {
                     );                
                 c.Index += 3;
                 c.Remove(); //40 removed
-
-                //get num35 i.e. the max health calc
+                
                 if (KnurlHealthType.Value == SettingMode.Percent) {
-                    c.Emit(OpCodes.Ldloc_S, (byte)41);
+                    c.Emit(OpCodes.Ldloc_S, (byte)41); //get num35 i.e. the max health calc
                     c.EmitDelegate<Func<float, float>>((health) => {
                         health *= KnurlHealthIncrease.Value;
                         return health;
                     });
                 } else if (KnurlHealthType.Value == SettingMode.Fixed) {
-                    c.Emit(OpCodes.Ldc_R4, KnurlHealthIncrease.Value/100);
+                    c.Emit(OpCodes.Ldc_R4, KnurlHealthIncrease.Value);
                 }
             };
         }
 
         private void ChangeHoof() {
+            //description change
+            LanguageAPI.Add("ITEM_HOOF_DESC", "Increases <style=cIsUtility>movement speed</style> by <style=cIsUtility>" + (InitialHoof.Value * 100).ToString() + "%</style> <style=cStack>(+" + (StackHoof.Value * 100).ToString() + "% per stack)</style>.");
+
             IL.RoR2.CharacterBody.RecalculateStats += (il) => {
                 //Locate hoof speed calculations
                 ILCursor c = new ILCursor(il);
@@ -288,6 +345,9 @@ namespace Horseyboi.ItemTweaks {
         }
 
         private void ChangeNRG() {
+            //description change
+            LanguageAPI.Add("ITEM_SPRINTBONUS_DESC", "<style=cIsUtility>Sprint speed</style> is improved by <style=cIsUtility>" + (InitialNRG.Value * 100).ToString() + "%</style> <style=cStack>(+" + (StackNRG.Value * 100).ToString() + "% per stack)</style>.");
+
             IL.RoR2.CharacterBody.RecalculateStats += (il) => {
                 //Locate drink speed calc
                 ILCursor c = new ILCursor(il);
