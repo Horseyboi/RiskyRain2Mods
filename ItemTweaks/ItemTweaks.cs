@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using RoR2;
@@ -14,7 +13,7 @@ namespace Horseyboi.ItemTweaks {
     [BepInDependency("com.bepis.r2api")]
     [BepInDependency("dev.ontrigger.itemstats", BepInDependency.DependencyFlags.SoftDependency)]
     [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.EveryoneNeedSameModVersion)] //technically this is default behavior but w/e
-    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.2.1")]
+    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.3.0")]
     [R2APISubmoduleDependency(nameof(LanguageAPI))]
 
     public class ItemTweaks : BaseUnityPlugin {
@@ -39,6 +38,12 @@ namespace Horseyboi.ItemTweaks {
         public static ConfigEntry<float> InitialNRG { get; set; }
         public static ConfigEntry<float> StackNRG { get; set; }
 
+        public static ConfigEntry<bool> EnableMeat { get; set; }
+        public static ConfigEntry<float> BaseMeatRegen { get; set; }
+        public static ConfigEntry<float> StackMeatRegen { get; set; }
+        public static ConfigEntry<float> BaseMeatDur { get; set; }
+        public static ConfigEntry<float> StackMeatDur { get; set; }
+
         public enum RAPSettingMode {
             Percent,
             Fixed,
@@ -52,6 +57,7 @@ namespace Horseyboi.ItemTweaks {
 
         public void Awake() {
             //Set up configs
+
             //Plates
             EnablePlates = Config.Bind<bool>(
                 "Repulsion Armor Plate",
@@ -83,6 +89,7 @@ namespace Horseyboi.ItemTweaks {
                 5f,
                 "Sets how much damage resistance monsters get from Repulsion Armor Plates."
                 );
+
             //Urn
             EnableUrn = Config.Bind<bool>(
                 "Mired Urn",
@@ -90,6 +97,7 @@ namespace Horseyboi.ItemTweaks {
                 true,
                 "Forces Mired Urn to only target enemies."
                 );
+
             //Knurl
             EnableKnurl = Config.Bind<bool>(
                 "Titanic Knurl",
@@ -109,6 +117,7 @@ namespace Horseyboi.ItemTweaks {
                 0.15f,
                 "Sets Titanic Knurl's health increase.\nIn Percent mode, this is a percent of your max health (e.g. 0.15 = 15%); in Fixed mode, this is a static value."
                 );
+
             //Hoof
             EnableHoof = Config.Bind<bool>(
                 "Pauls Goat Hoof",
@@ -128,6 +137,7 @@ namespace Horseyboi.ItemTweaks {
                 0.09f,
                 "Sets the bonus Hoof grants per additional stack."
                 );
+
             //Drink
             EnableNRG = Config.Bind<bool>(
                 "Energy Drink",
@@ -148,6 +158,39 @@ namespace Horseyboi.ItemTweaks {
                 "Sets the bonus Energy Drink grants per additional stack."
                 );
 
+            //Meat
+            EnableMeat = Config.Bind<bool>(
+                "Fresh Meat",
+                "Enabled",
+                true,
+                "Enables Fresh Meat changes."
+                );
+            BaseMeatRegen = Config.Bind<float>(
+                "Fresh Meat",
+                "Base Regen",
+                3f,
+                "Sets the base health regeneration of the Fresh Meat buff."
+                );
+            StackMeatRegen = Config.Bind<float>(
+                "Fresh Meat",
+                "Stack Regen",
+                1.5f,
+                "How much extra health regeneration the Fresh Meat buff gets per stack."
+                );
+            BaseMeatDur = Config.Bind<float>(
+                "Fresh Meat",
+                "Base Duration",
+                3f,
+                "Sets the base duration of the Fresh Meat buff."
+                );
+            StackMeatDur = Config.Bind<float>(
+                "Fresh Meat",
+                "Stack Duration",
+                3f,
+                "How much extra duration the Fresh Meat buff gets per stack."
+                );
+
+
             //check if itemstats is installed so I can funk out some better item descs
             if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("dev.ontrigger.itemstats")) {
                 AdvTooltips.DoStuff();
@@ -157,7 +200,7 @@ namespace Horseyboi.ItemTweaks {
                 ChangeArmorPlates();
             }
             if (EnableUrn.Value) {
-                ChangeMiredUrn(); //figure out a way to make urn only tar enemies?
+                ChangeMiredUrn(); //figure out a way to make urn only tar debuff enemies?
             }
             if (EnableKnurl.Value) {
                 ChangeKnurl();
@@ -167,6 +210,9 @@ namespace Horseyboi.ItemTweaks {
             }
             if (EnableNRG.Value) {
                 ChangeNRG();
+            }
+            if (EnableMeat.Value) {
+                ChangeMeat();
             }
         }
 
@@ -363,6 +409,52 @@ namespace Horseyboi.ItemTweaks {
                 c.Emit(OpCodes.Ldarg_0);
                 c.EmitDelegate<Func<CharacterBody, float>>((self) => {
                     return (InitialNRG.Value + StackNRG.Value * (self.inventory.GetItemCount(ItemIndex.SprintBonus) - 1)) / self.sprintingSpeedMultiplier;
+                });
+            };
+        }
+
+        private void ChangeMeat() {
+            //description change
+            LanguageAPI.Add("ITEM_REGENONKILL_DESC", "Increases <style=cIsHealing>base health regeneration</style> by <style=cIsHealing>" + BaseMeatRegen.Value.ToString() + " hp/s</style> <style=cStack>(+" + StackMeatRegen.Value.ToString() + " hp/s per stack)</style> for <style=cIsUtility>" + BaseMeatDur.Value.ToString() + "s</style> <style=cStack>(+" + StackMeatDur.Value.ToString() + "s per stack)</style> after killing an enemy.");
+
+            //change meat buff regen
+            IL.RoR2.CharacterBody.RecalculateStats += (il) => {
+                ILCursor c = new ILCursor(il);
+                c.GotoNext(
+                    x => x.MatchLdcR4(2f),
+                    x => x.MatchLdloc(45),
+                    x => x.MatchMul(),
+                    x => x.MatchStloc(48),
+                    x => x.MatchLdarg(0)
+                    );
+                c.Index -= 5;
+                c.RemoveRange(8);
+                c.EmitDelegate<Func<CharacterBody, float>>((self) => {
+                    if (self.HasBuff(BuffIndex.MeatRegenBoost))
+                    {
+                        int meatNum = self.inventory.GetItemCount(ItemIndex.RegenOnKill);
+                        return BaseMeatRegen.Value + (meatNum - 1) * StackMeatRegen.Value;
+                    }
+                    return 0f;
+                });                
+            };
+
+            //change meat buff duration
+            IL.RoR2.GlobalEventManager.OnCharacterDeath += (il) => {
+                ILCursor c = new ILCursor(il);
+                c.GotoNext(
+                    x => x.MatchLdcR4(3),
+                    x => x.MatchLdloc(57),
+                    x => x.MatchConvR4(),
+                    x => x.MatchMul(),
+                    x => x.MatchCallvirt<CharacterBody>("AddTimedBuff")
+                    );
+                c.Index -= 1;
+                c.RemoveRange(6);
+                //c.Emit(OpCodes.Ldloc_S,13);
+                c.EmitDelegate<Action<CharacterBody>>((self) => {
+                    int meatNum = self.inventory.GetItemCount(ItemIndex.RegenOnKill);
+                    self.AddTimedBuff(BuffIndex.MeatRegenBoost, BaseMeatDur.Value + (meatNum - 1) * StackMeatDur.Value);
                 });
             };
         }
