@@ -1,13 +1,6 @@
-using System;
 using System.Collections.Generic;
 using BepInEx;
-using BepInEx.Configuration;
 using RoR2;
-using R2API;
-using R2API.Utils;
-using Mono.Cecil.Cil;
-using MonoMod.Cil;
-using UnityEngine;
 using ItemStats;
 using ItemStats.Stat;
 using ItemStats.ValueFormatters;
@@ -78,6 +71,22 @@ namespace Horseyboi.ItemTweaks {
                         (itemCount, ctx) => (ItemTweaks.InitialNRG.Value - ItemTweaks.StackNRG.Value) + itemCount * ItemTweaks.StackNRG.Value,
                         (value, ctx) => $"Sprint Increase: {value.FormatPercentage()}"
                     )
+                };
+            }
+            
+            if (ItemTweaks.EnableMeat.Value)
+            {
+                var itemDef = ItemStatsMod.GetItemStatDef(ItemIndex.RegenOnKill);
+                itemDef.Stats = new List<ItemStat>
+                {
+                    new ItemStat(
+                        (itemCount, ctx) => ItemTweaks.BaseMeatDur.Value + (itemCount - 1) * ItemTweaks.StackMeatDur.Value,
+                        (value, ctx) => $"Buff Duration: {value.FormatInt("s")}"
+                        ),
+                    new ItemStat(
+                        (itemCount, ctx) => ItemTweaks.BaseMeatRegen.Value + (itemCount - 1) * ItemTweaks.BaseMeatRegen.Value,
+                        (value, ctx) => $"Bonus Health Regen: {value.FormatInt("HP/s")}"
+                        )
                 };
             }
         }
