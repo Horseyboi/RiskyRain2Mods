@@ -42,7 +42,7 @@ namespace ItemTweaks.Tweaks {
                             x => x.MatchLdcI4(0),
                             x => x.MatchStloc(1)
                             );
-                        c.Index -= 5;
+                        c.Index -= 7;
                         c.RemoveRange(5);
                     };
                 }
