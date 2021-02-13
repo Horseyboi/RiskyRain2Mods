@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using BepInEx.Configuration;
 using R2API;
 using R2API.Utils;
@@ -20,7 +20,7 @@ namespace ItemTweaks {
     [BepInDependency("com.bepis.r2api")]
     [BepInDependency("dev.ontrigger.itemstats", BepInDependency.DependencyFlags.SoftDependency)]
     [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.EveryoneNeedSameModVersion)] //technically this is default behavior but w/e
-    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.4.0")]
+    [BepInPlugin("com.Horseyboi.ItemTweaks", "Item Tweaks", "1.4.3")]
     [R2APISubmoduleDependency(nameof(LanguageAPI))]
 
     public class ItemTweaks : BaseUnityPlugin {
@@ -43,22 +43,22 @@ namespace ItemTweaks {
 
             //Run all the tweaks
             //Common
-            Tweaks.ArmorPlates.ChangeItem();
+            Tweaks.ArmorPlates.ChangeItem(); //not sure how to go about improving this hook ngl
             Tweaks.EnergyDrink.ChangeItem();
-            Tweaks.FreshMeat.ChangeItem();
+            Tweaks.FreshMeat.ChangeItem(); //to fix
             Tweaks.GoatHoof.ChangeItem();
 
             //Uncommon
-            Tweaks.LeechingSeed.ChangeItem();
+            Tweaks.LeechingSeed.ChangeItem(); //to fix
 
             //Rare
-            Tweaks.FrostRelic.ChangeItem();
+            Tweaks.FrostRelic.ChangeItem(); //to fix
 
             //Boss
-            Tweaks.HalcyonSeed.ChangeItem();
+            Tweaks.HalcyonSeed.ChangeItem(); //to fix
             Tweaks.MiredUrn.ChangeItem();
-            Tweaks.QueensGland.ChangeItem();
-            Tweaks.TitanicKnurl.ChangeItem();
+            Tweaks.QueensGland.ChangeItem(); //to fix
+            Tweaks.TitanicKnurl.ChangeItem(); //to fix
 
             //Lunar
             Tweaks.GestureDrowned.ChangeItem();
