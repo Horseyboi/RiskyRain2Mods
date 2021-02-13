@@ -1,6 +1,7 @@
-﻿using MonoMod.Cil;
+using MonoMod.Cil;
 using R2API;
 using System;
+using RoR2;
 
 namespace ItemTweaks.Tweaks {
     internal static class GoatHoof {
@@ -32,19 +33,26 @@ namespace ItemTweaks.Tweaks {
                 IL.RoR2.CharacterBody.RecalculateStats += (il) => {
                     //Locate hoof speed calculations
                     ILCursor c = new ILCursor(il);
-                    c.GotoNext(
-                        x => x.MatchLdloc(54),
-                        x => x.MatchLdloc(3),
-                        x => x.MatchConvR4(),
-                        x => x.MatchLdcR4(0.14f)
-                        );
-                    c.Index += 3;
+
+                    int hoofCountLoc = 0;
+
+                    c.GotoNext(MoveType.After,
+                        x => x.MatchLdcI4((int)ItemIndex.Hoof),
+                        x => x.MatchCallOrCallvirt<Inventory>("GetItemCount"),
+                        x => x.MatchStloc(out hoofCountLoc)
+                    );
+
+                    c.GotoNext(MoveType.After,
+                        x => x.MatchLdloc(hoofCountLoc),
+                        x => x.MatchConvR4()
+                    );
+
                     //remove the default instructions for paul's goat hoof; we makin our own
                     c.RemoveRange(3);
                     c.EmitDelegate<Func<float, float, float>>((speed, hoofs) => {
                         if (hoofs > 0) {
-                            speed += InitialHoof.Value - StackHoof.Value; //Get the fixed bonus
-                            speed += StackHoof.Value * hoofs; //Add the bonus per hoof
+                            speed += InitialHoof.Value; //Get the fixed bonus
+                            speed += StackHoof.Value * (hoofs - 1); //Add the bonus per hoof
                         }
                         return speed;
                     });
