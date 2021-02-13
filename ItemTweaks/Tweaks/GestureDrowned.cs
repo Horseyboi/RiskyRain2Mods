@@ -37,7 +37,7 @@ namespace ItemTweaks.Tweaks {
                                 origin = self.characterBody.corePosition
                             };
                             EffectManager.SpawnEffect(brittlevfx, effectData, true);
-                            return true;
+                            return false;
                         } else {
                             orig(self); //you got lucky, this time (assuming you even had gesture)
                         }
