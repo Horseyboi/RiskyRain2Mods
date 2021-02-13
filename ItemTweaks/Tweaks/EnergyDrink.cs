@@ -1,4 +1,4 @@
-﻿using Mono.Cecil.Cil;
+using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using R2API;
 using RoR2;
@@ -34,13 +34,21 @@ namespace ItemTweaks.Tweaks {
                 IL.RoR2.CharacterBody.RecalculateStats += (il) => {
                     //Locate drink speed calc
                     ILCursor c = new ILCursor(il);
+
+                    int nrgCountLoc = 0;
+
+                    c.GotoNext(MoveType.After,
+                        x => x.MatchLdcI4((int)ItemIndex.SprintBonus),
+                        x => x.MatchCallOrCallvirt<Inventory>("GetItemCount"),
+                        x => x.MatchStloc(out nrgCountLoc)
+                    );
+
                     c.GotoNext(
-                        x => x.MatchLdloc(54),
-                        x => x.MatchLdcR4(0.1f),
-                        x => x.MatchLdcR4(0.2f),
-                        x => x.MatchLdloc(17)
-                        );
-                    c.Index += 1;
+                        x => x.MatchLdloc(nrgCountLoc),
+                        x => x.MatchConvR4()
+                    );
+                    c.Index -= 2;
+
                     //remove the default instructions for energy drink
                     c.RemoveRange(9);
                     c.Emit(OpCodes.Ldarg_0);
