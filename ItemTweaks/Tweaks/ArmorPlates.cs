@@ -1,4 +1,4 @@
-﻿using Mono.Cecil.Cil;
+using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using R2API;
 using R2API.Utils;
@@ -52,7 +52,7 @@ namespace ItemTweaks.Tweaks {
                 } else {
                     rapDesc = "Reduce all <style=cIsDamage>incoming damage</style> by <style=cIsDamage>";
                     if (PlateDRType.Value == RAPSettingMode.Percent) {
-                        rapDesc += (ArmorPlateDR.Value * 100).ToString() + "%</style> of your <style=cIsHealing>maximum health and shields</style> <style=cStack> (+" + (ArmorPlateDR.Value * 100).ToString() + "% per stack)</style>.";
+                        rapDesc += (ArmorPlateDR.Value * 100).ToString() + "%</style> of your <style=cIsHealing>maximum health and shields</style> <style=cStack>(+" + (ArmorPlateDR.Value * 100).ToString() + "% per stack)</style>.";
                     } else if (PlateDRType.Value == RAPSettingMode.Fixed) {
                         rapDesc += ArmorPlateDR.Value.ToString() + "</style> <style=cStack> (+" + (ArmorPlateDR.Value).ToString() + " per stack)</style>.";
                     }
@@ -63,12 +63,11 @@ namespace ItemTweaks.Tweaks {
                 IL.RoR2.HealthComponent.TakeDamage += (il) => {
 
                     //Match the location of the armor plate calculation and set the cursor to the right line
-                    ILCursor c = new ILCursor(il);
+                    ILCursor c = new ILCursor(il); //idk how to enhance this hook
                     c.GotoNext(
                         x => x.MatchLdcR4(1),
                         x => x.MatchLdloc(5),
-                        x => x.MatchLdcR4(5),
-                        x => x.MatchLdarg(0)
+                        x => x.MatchLdcR4(5)
                         );
                     c.Index += 2;
                     c.Remove();
@@ -110,29 +109,18 @@ namespace ItemTweaks.Tweaks {
                 };
 
                 if (PlateDRType.Value == RAPSettingMode.Armor || MonsterPlateDRType.Value == RAPSettingMode.Armor) {
-                    IL.RoR2.CharacterBody.RecalculateStats += (il) => { //further analysis says I probably could have used an event hook but this seems to be fine
-                        //find the armor calculations and put the cursor in the right spot
-                        ILCursor c = new ILCursor(il);
-                        c.GotoNext(
-                            x => x.MatchLdarg(0),
-                            x => x.MatchLdarg(0),
-                            x => x.MatchLdfld(typeof(RoR2.CharacterBody).GetField("baseArmor")),
-                            x => x.MatchLdarg(0)
-                            );
-                        c.Index += 9;
+                    On.RoR2.CharacterBody.RecalculateStats += (orig, self) => {
+                        orig(self);
 
-                        //push the CharacterBody onto the stack
-                        c.Emit(OpCodes.Ldarg_0);
-                        //consume it for the context to do all the stuff here
-                        c.EmitDelegate<Action<CharacterBody>>((self) => {
-                            var numPlates = self.inventory.GetItemCount(ItemIndex.ArmorPlate);
-                            //armor is readonly so Reflection is used to tiptoe around that
+                        int numPlates = self.inventory.GetItemCount(ItemIndex.ArmorPlate);
+
+                        if (numPlates > 0) {
                             if (self.teamComponent.teamIndex == TeamIndex.Player && PlateDRType.Value == RAPSettingMode.Armor) { //make sure this is on a team that gets armor
                                 self.InvokeMethod("set_armor", self.armor + numPlates * ArmorPlateDR.Value);
                             } else if (MonsterPlateDRType.Value == RAPSettingMode.Armor) { //same deal here
                                 self.InvokeMethod("set_armor", self.armor + numPlates * MonsterPlateDR.Value);
                             }
-                        });
+                        }
                     };
                 }
             }
